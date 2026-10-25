@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { askGemini } from "@/lib/student-ai";
+import { askAI } from "@/lib/student-ai";
 
 export async function POST(request: Request) {
   const supabase = await createClient();
@@ -14,11 +14,12 @@ export async function POST(request: Request) {
     .select("*").eq("id", questionId).single();
   if (!session || !question) return NextResponse.json({ error: "Session or question not found" }, { status: 404 });
 
-  const prompt = `Evaluate this mock interview answer for a ${session.interview_id ? "student candidate" : "candidate"}. Return ONLY valid JSON with integer scores from 0 to 10 for relevance_score, technical_score, clarity_score, overall_score, plus a concise feedback string with one strength and one improvement suggestion. Do not use markdown and do not invent facts. Be encouraging but honest.\n\nQuestion: ${question.question_text}\n\nCandidate answer: ${String(answer).slice(0, 6000)}`;
+  const prompt = `Evaluate this mock interview answer for a ${session.interview_id ? "student candidate" : "candidate"}. Return valid JSON with integer scores from 0 to 10 for relevance_score, technical_score, clarity_score, overall_score, plus a concise feedback string with one strength and one improvement suggestion. Do not use markdown and do not invent facts. Be encouraging but honest.\n\nQuestion: ${question.question_text}\n\nCandidate answer: ${String(answer).slice(0, 6000)}`;
+
   let evaluation: any;
   try {
-    const response = await askGemini(prompt);
-    evaluation = JSON.parse(response.replace(/^```json\s*|\s*```$/g, ""));
+    const response = await askAI(prompt);
+    evaluation = JSON.parse(response.replace(/^```json\s*|\s*```$/g, "").trim());
   } catch (error) {
     console.error("AI evaluation error:", error);
 
@@ -32,12 +33,23 @@ export async function POST(request: Request) {
       { status: 502 }
     );
   }
+
+  let feedbackText = "Good attempt. Try to make the answer more specific, structured, and evidence-based.";
+  if (typeof evaluation.feedback === "string") {
+    feedbackText = evaluation.feedback;
+  } else if (evaluation.feedback && typeof evaluation.feedback === "object") {
+    const parts: string[] = [];
+    if (evaluation.feedback.strength) parts.push(`Strength: ${evaluation.feedback.strength}`);
+    if (evaluation.feedback.improvement) parts.push(`Improvement: ${evaluation.feedback.improvement}`);
+    feedbackText = parts.length ? parts.join(" ") : JSON.stringify(evaluation.feedback);
+  }
+
   const clean = {
     relevance_score: Math.max(0, Math.min(10, Number(evaluation.relevance_score) || 0)),
     technical_score: Math.max(0, Math.min(10, Number(evaluation.technical_score) || 0)),
     clarity_score: Math.max(0, Math.min(10, Number(evaluation.clarity_score) || 0)),
     overall_score: Math.max(0, Math.min(10, Number(evaluation.overall_score) || 0)),
-    feedback: String(evaluation.feedback || "Good attempt. Try to make the answer more specific, structured, and evidence-based."),
+    feedback: feedbackText,
   };
 
   const { error } = await (supabase.from("student_answers") as any).insert({

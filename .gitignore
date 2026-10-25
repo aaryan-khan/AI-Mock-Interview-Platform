@@ -42,3 +42,6 @@ test-results/
 *.pem
 .vercel
 src/hooks/use-voice.ts.backup
+.mock-db.json
+AGENTS.md
+CLAUDE.md

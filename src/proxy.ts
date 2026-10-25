@@ -6,6 +6,10 @@ import { NextResponse, type NextRequest } from "next/server";
  * This is the official Supabase pattern for Next.js App Router.
  */
 export async function proxy(request: NextRequest) {
+  if (process.env.NEXT_PUBLIC_MOCK_SUPABASE === "true") {
+    return NextResponse.next({ request });
+  }
+
   // Skip cookie refresh for mobile requests using Bearer token auth
   if (request.headers.get("authorization")?.startsWith("Bearer ")) {
     return NextResponse.next({ request });

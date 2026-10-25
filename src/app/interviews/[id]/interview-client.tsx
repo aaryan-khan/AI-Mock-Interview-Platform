@@ -22,6 +22,7 @@ export default function InterviewClient({interview,questions}:{interview:Intervi
   const router=useRouter();
   const videoRef=useRef<HTMLVideoElement>(null);
   const recognitionRef=useRef<any>(null);
+  const isListeningRef=useRef<boolean>(false);
   const [sessionId,setSessionId]=useState("");
   const [index,setIndex]=useState(0);
   const [answer,setAnswer]=useState("");
@@ -51,6 +52,7 @@ export default function InterviewClient({interview,questions}:{interview:Intervi
   },[index,q?.question_text,autoRead]);
 
   useEffect(()=>()=>{
+    isListeningRef.current = false;
     recognitionRef.current?.stop();
     const stream=videoRef.current?.srcObject as MediaStream|null;
     stream?.getTracks().forEach((track)=>track.stop());
@@ -73,46 +75,122 @@ export default function InterviewClient({interview,questions}:{interview:Intervi
   }
 
   function stopRecognition(){
-    recognitionRef.current?.stop();
-    recognitionRef.current=null;
+    isListeningRef.current = false;
+    try { recognitionRef.current?.stop(); } catch {}
+    recognitionRef.current = null;
     setListening(false);
     setInterim("");
   }
 
-  function toggleSpeech(){
-    if(listening){stopRecognition();return;}
+  function startRecognitionInstance() {
+    if (!isListeningRef.current) return;
+    const C = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!C) return;
+
+    try {
+      const recognition = new C();
+      recognition.lang = "en-US";
+      recognition.continuous = true;
+      recognition.interimResults = true;
+      recognition.maxAlternatives = 1;
+
+      recognition.onstart = () => {
+        setListening(true);
+        setError("");
+      };
+
+      recognition.onresult = (event: any) => {
+        let pending = "";
+        let finalized = "";
+        for (let i = event.resultIndex; i < event.results.length; i++) {
+          const result = event.results[i];
+          const transcript = String(result?.[0]?.transcript ?? "").trim();
+          if (!transcript) continue;
+          if (result.isFinal) finalized = appendTranscript(finalized, transcript);
+          else pending = appendTranscript(pending, transcript);
+        }
+        if (finalized) {
+          setAnswer((prev) => appendTranscript(prev, finalized));
+          setInterim("");
+        } else {
+          setInterim(pending);
+        }
+      };
+
+      recognition.onerror = (event: any) => {
+        console.warn("Speech recognition event:", event?.error);
+        if (event?.error === "not-allowed" || event?.error === "service-not-allowed") {
+          isListeningRef.current = false;
+          setListening(false);
+          setInterim("");
+          setError("Microphone permission was denied. Please check your browser's site settings or URL bar to allow microphone access.");
+        } else if (event?.error === "network") {
+          isListeningRef.current = false;
+          setListening(false);
+          setInterim("");
+          setError("Browser speech recognition network error. Please verify your connection or type your response.");
+        } else if (event?.error === "no-speech") {
+          // Keep listening active on brief silence
+        } else if (event?.error !== "aborted") {
+          setError(`Microphone notice: ${event?.error}. You can also type directly in the box.`);
+        }
+      };
+
+      recognition.onend = () => {
+        if (isListeningRef.current) {
+          try {
+            recognition.start();
+          } catch {
+            setListening(false);
+            setInterim("");
+            isListeningRef.current = false;
+          }
+        } else {
+          setListening(false);
+          setInterim("");
+          recognitionRef.current = null;
+        }
+      };
+
+      recognitionRef.current = recognition;
+      recognition.start();
+      setListening(true);
+    } catch (err: any) {
+      console.error("Failed to start speech recognition instance:", err);
+      setError("Could not start speech recognition. Please try clicking again or typing your response.");
+      setListening(false);
+      isListeningRef.current = false;
+    }
+  }
+
+  async function toggleSpeech(){
+    if (listening || isListeningRef.current) {
+      stopRecognition();
+      return;
+    }
     setError("");
-    const C=window.SpeechRecognition||window.webkitSpeechRecognition;
-    if(!C){setError("Speech recognition is not supported in this browser. Type your answer instead.");return;}
-    const recognition=new C();
-    recognition.lang="en-US";
-    recognition.continuous=true;
-    recognition.interimResults=true;
-    recognition.maxAlternatives=1;
-    recognition.onresult=(event:any)=>{
-      let pending="";
-      let finalized="";
-      for(let i=event.resultIndex;i<event.results.length;i++){
-        const result=event.results[i];
-        const transcript=String(result?.[0]?.transcript ?? "").trim();
-        if(!transcript) continue;
-        if(result.isFinal) finalized=appendTranscript(finalized,transcript);
-        else pending=appendTranscript(pending,transcript);
+
+    // Explicitly prompt for microphone access via getUserMedia if needed
+    try {
+      if (typeof navigator !== "undefined" && navigator.mediaDevices?.getUserMedia) {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        stream.getTracks().forEach((track) => track.stop());
       }
-      if(finalized){
-        setAnswer(prev=>appendTranscript(prev,finalized));
-        setInterim("");
-      } else {
-        setInterim(pending);
+    } catch (permErr: any) {
+      if (permErr?.name === "NotAllowedError" || permErr?.name === "PermissionDeniedError") {
+        setError("Microphone permission was not allowed. Please click the icon in your browser URL address bar to allow microphone access, then try again.");
+        return;
       }
-    };
-    recognition.onerror=(event:any)=>{
-      if(event?.error!=="aborted" && event?.error!=="no-speech") setError(`Microphone error: ${event.error}. You can type instead.`);
-      setListening(false); setInterim("");
-    };
-    recognition.onend=()=>{setListening(false);setInterim("");recognitionRef.current=null;};
-    recognitionRef.current=recognition;
-    try{recognition.start();setListening(true);}catch{setError("Could not start the microphone. Please try again.");}
+    }
+
+    const C = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!C) {
+      setError("Speech recognition is not supported in this browser. Please use Google Chrome or Microsoft Edge, or type your answer.");
+      return;
+    }
+
+    isListeningRef.current = true;
+    startRecognitionInstance();
   }
 
   async function submitAnswer(){

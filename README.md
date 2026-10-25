@@ -1,6 +1,6 @@
 # InterviewAI — Student Edition
 
-A student-friendly AI mock interview platform built with Next.js, Supabase, Gemini, and browser voice/camera APIs.
+A student-friendly open-source AI mock interview platform built with Next.js, local LLM (Ollama) / Gemini, and browser voice/camera APIs.
 
 ## Main flow
 

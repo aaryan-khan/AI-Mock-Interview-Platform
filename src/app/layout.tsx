@@ -16,7 +16,7 @@ const headingFont = localFont({
 
 export const metadata: Metadata = {
   title: "InterviewAI — Student Mock Interview",
-  description: "A student-friendly AI mock interview platform with Gemini evaluation, voice input, camera practice, and interview history.",
+  description: "A student-friendly AI mock interview platform with intelligent AI evaluation, voice input, camera practice, and interview history.",
 };
 
 export const viewport: Viewport = {

@@ -14,8 +14,8 @@ export default async function DashboardPage() {
 
   return <StudentShell email={user.email} title="Welcome back" subtitle="Turn interview practice into measurable progress, one session at a time.">
     <section className="dashboard-hero">
-      <div><span className="eyebrow light">YOUR NEXT PRACTICE</span><h2>Ready for another round?</h2><p>Choose a role and let Gemini build a tailored interview in seconds.</p><Link href="/interviews/new" className="button button-light"><Plus size={17}/> Create interview <ArrowRight size={16}/></Link></div>
-      <div className="hero-visual"><div className="floating-badge badge-one"><Sparkles size={15}/> Gemini powered</div><div className="hero-orbit-large"><BrainCircuit size={52}/></div><div className="floating-badge badge-two"><CheckCircle2 size={15}/> Instant feedback</div></div>
+      <div><span className="eyebrow light">YOUR NEXT PRACTICE</span><h2>Ready for another round?</h2><p>Choose a role and let AI build a tailored interview in seconds.</p><Link href="/interviews/new" className="button button-light"><Plus size={17}/> Create interview <ArrowRight size={16}/></Link></div>
+      <div className="hero-visual"><div className="floating-badge badge-one"><Sparkles size={15}/> AI powered</div><div className="hero-orbit-large"><BrainCircuit size={52}/></div><div className="floating-badge badge-two"><CheckCircle2 size={15}/> Instant feedback</div></div>
     </section>
 
     <section className="metric-grid metric-grid-4">
